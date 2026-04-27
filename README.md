@@ -72,6 +72,7 @@ ansible-docker-project/
 ```bash
 git clone https://github.com/Shibnath27/ansible-docker-project.git
 cd ansible-docker-project
+
 ```
 
 ---
@@ -79,12 +80,16 @@ cd ansible-docker-project
 ### 2. Install Required Collection
 
 ```bash
-ansible-galaxy collection install community.docker
+ansible-galaxy init roles/common
+ansible-galaxy init roles/docker
+ansible-galaxy init roles/nginx
 ```
 
 ---
 
 ### 3. Configure Inventory
+
+`inventory.ini`
 
 ```ini
 [web]
@@ -92,7 +97,8 @@ web-server ansible_host=<PUBLIC_IP>
 
 [all:vars]
 ansible_user=ec2-user
-ansible_ssh_private_key_file=~/your-key.pem
+ansible_ssh_private_key_file=~/.ssh/ansible-practice
+ansible_python_interpreter=/usr/bin/python3
 ```
 
 ---
@@ -106,40 +112,74 @@ ansible_ssh_private_key_file=~/your-key.pem
 inventory = inventory.ini
 host_key_checking = False
 vault_password_file = .vault_pass
+remote_user = ec2-user
+private_key_file = ~/.ssh/ansible-practice
+
 ```
 
 ---
 
 ## 🔧 Common Role
 
+The common role runs on every server -- baseline packages and setup.
 ### `roles/common/tasks/main.yml`
 
 ```yaml
+---
 - name: Update package cache
   yum:
     update_cache: true
+  tags: common
 
 - name: Install common packages
   yum:
     name: "{{ common_packages }}"
     state: present
+  tags: common
+
+- name: Set hostname
+  hostname:
+    name: "{{ inventory_hostname }}"
+  tags: common
 
 - name: Set timezone
   timezone:
     name: "{{ timezone }}"
+  tags: common
 
 - name: Create deploy user
   user:
     name: deploy
     groups: wheel
     shell: /bin/bash
+    state: present
+  tags: common
 ```
+(Use apt instead of yum if your instances run Ubuntu)
+### `group_vars/all.yml:`
 
+```yaml
+---
+timezone: Asia/Kolkata
+project_name: devops-app
+app_env: development
+common_packages:
+  - vim
+  - curl
+  - wget
+  - git
+  - htop
+  - tree
+  - jq
+  - unzip
+
+```
 ---
 
 ## 🐳 Docker Role
 
-### Defaults
+This role installs Docker, starts the service, pulls images, and runs containers.
+### `roles/docker/defaults/main.yml`:
 
 ```yaml
 docker_app_image: nginx
@@ -149,7 +189,7 @@ docker_app_port: 8080
 docker_container_port: 80
 ```
 
-### Tasks
+### `roles/docker/tasks/main.yml`
 
 ```yaml
 - name: Install Docker
@@ -183,36 +223,82 @@ docker_container_port: 80
     restart_policy: always
     ports:
       - "{{ docker_app_port }}:{{ docker_container_port }}"
-```
 
+- name: Wait for container to be healthy
+  uri:
+    url: "http://localhost:{{ docker_app_port }}"
+    status_code: 200
+  retries: 5
+  delay: 3
+  register: health_check
+  until: health_check.status == 200
+```
+Tag all tasks with docker.
+
+### `roles/docker/handlers/main.yml`:
+
+```yaml
+---
+- name: Restart Docker
+  service:
+    name: docker
+    state: restarted
+```
+Install the required Ansible collection (needed for community.docker modules):
+```bash
+ansible-galaxy collection install community.docker
+```
 ---
 
 ## 🌐 Nginx Role
 
-### Defaults
+This role installs Nginx and configures it as a reverse proxy to the Docker container.
+### `roles/nginx/defaults/main.yml`
 
 ```yaml
+---
 nginx_http_port: 80
 nginx_upstream_port: 8080
+nginx_server_name: "_"
 ```
 
-### Template: `app-proxy.conf.j2`
+### Template: `roles/nginx/templates/app-proxy.conf.j2`
 
 ```nginx
+# Reverse Proxy to Docker Container -- Managed by Ansible
 upstream docker_app {
     server 127.0.0.1:{{ nginx_upstream_port }};
 }
 
 server {
     listen {{ nginx_http_port }};
+    server_name {{ nginx_server_name }};
 
     location / {
         proxy_pass http://docker_app;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
     }
+
+    location /health {
+        access_log off;
+        return 200 'OK';
+        add_header Content-Type text/plain;
+    }
+
+{% if app_env == 'production' %}
+    access_log /var/log/nginx/{{ project_name }}_access.log;
+    error_log /var/log/nginx/{{ project_name }}_error.log;
+{% else %}
+    access_log /var/log/nginx/{{ project_name }}_access.log;
+    error_log /var/log/nginx/{{ project_name }}_error.log debug;
+{% endif %}
 }
 ```
 
-### Tasks
+### Tasks `roles/nginx/tasks/main.yml`
 
 ```yaml
 - name: Install Nginx
@@ -231,13 +317,31 @@ server {
     name: nginx
     state: started
     enabled: true
-```
 
+- name: Test Nginx configuration
+  command: nginx -t
+  changed_when: false
+```
+Tag all tasks with nginx.
+### `roles/nginx/handlers/main.yml`
+
+```yaml
+---
+- name: Reload Nginx
+  service:
+    name: nginx
+    state: reloaded
+
+- name: Restart Nginx
+  service:
+    name: nginx
+    state: restarted
+```
 ---
 
 ## 🔐 Ansible Vault
 
-### Create Vault
+### 1. Create Vault
 
 ```bash
 ansible-vault create group_vars/web/vault.yml
@@ -249,7 +353,49 @@ ansible-vault create group_vars/web/vault.yml
 vault_docker_username: your-username
 vault_docker_password: your-token
 ```
+### 2. Create a vault password file for convenience:
 
+```bash
+echo "YourVaultPassword" > .vault_pass
+chmod 600 .vault_pass
+echo ".vault_pass" >> .gitignore
+```
+### 3. Reference it in ansible.cfg:
+```ini
+[defaults]
+inventory = inventory.ini
+host_key_checking = False
+vault_password_file = .vault_pass
+```
+---
+
+## Write the Master Playbook
+
+### `site.yml`
+
+```bash
+---
+- name: Apply common configuration
+  hosts: all
+  become: true
+  roles:
+    - common
+  tags: common
+
+- name: Install Docker and run containers
+  hosts: web
+  become: true
+  roles:
+    - docker
+  tags: docker
+
+- name: Configure Nginx reverse proxy
+  hosts: web
+  become: true
+  roles:
+    - nginx
+  tags: nginx
+```
 ---
 
 ## 🚀 Deployment
@@ -265,7 +411,18 @@ ansible-playbook site.yml --check --diff
 ```bash
 ansible-playbook site.yml
 ```
+### Use tags for selective execution:
 
+```bash
+# Only set up Docker and containers
+ansible-playbook site.yml --tags docker
+
+# Only update Nginx config
+ansible-playbook site.yml --tags nginx
+
+# Skip common setup
+ansible-playbook site.yml --skip-tags common
+```
 ---
 
 ## 🎯 Verification
