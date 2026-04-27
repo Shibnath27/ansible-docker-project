@@ -69,7 +69,7 @@ ansible-docker-project/
 
 ### 1. Clone Repo
 
-```
+```bash
 git clone https://github.com/Shibnath27/ansible-docker-project.git
 cd ansible-docker-project
 ```
@@ -78,7 +78,7 @@ cd ansible-docker-project
 
 ### 2. Install Required Collection
 
-```
+```bash
 ansible-galaxy collection install community.docker
 ```
 
@@ -86,7 +86,7 @@ ansible-galaxy collection install community.docker
 
 ### 3. Configure Inventory
 
-```
+```ini
 [web]
 web-server ansible_host=<PUBLIC_IP>
 
@@ -101,7 +101,7 @@ ansible_ssh_private_key_file=~/your-key.pem
 
 `ansible.cfg`
 
-```
+```ini
 [defaults]
 inventory = inventory.ini
 host_key_checking = False
@@ -114,7 +114,7 @@ vault_password_file = .vault_pass
 
 ### `roles/common/tasks/main.yml`
 
-```
+```yaml
 - name: Update package cache
   yum:
     update_cache: true
@@ -141,7 +141,7 @@ vault_password_file = .vault_pass
 
 ### Defaults
 
-```
+```yaml
 docker_app_image: nginx
 docker_app_tag: latest
 docker_app_name: myapp
@@ -151,7 +151,7 @@ docker_container_port: 80
 
 ### Tasks
 
-```
+```yaml
 - name: Install Docker
   yum:
     name: docker
@@ -191,14 +191,14 @@ docker_container_port: 80
 
 ### Defaults
 
-```
+```yaml
 nginx_http_port: 80
 nginx_upstream_port: 8080
 ```
 
 ### Template: `app-proxy.conf.j2`
 
-```
+```nginx
 upstream docker_app {
     server 127.0.0.1:{{ nginx_upstream_port }};
 }
@@ -214,7 +214,7 @@ server {
 
 ### Tasks
 
-```
+```yaml
 - name: Install Nginx
   yum:
     name: nginx
@@ -239,13 +239,13 @@ server {
 
 ### Create Vault
 
-```
+```bash
 ansible-vault create group_vars/web/vault.yml
 ```
 
 ### Example
 
-```
+```bash
 vault_docker_username: your-username
 vault_docker_password: your-token
 ```
@@ -256,13 +256,13 @@ vault_docker_password: your-token
 
 ### Dry Run
 
-```
+```bash
 ansible-playbook site.yml --check --diff
 ```
 
 ### Full Deployment
 
-```
+```bash
 ansible-playbook site.yml
 ```
 
@@ -272,19 +272,19 @@ ansible-playbook site.yml
 
 ### Check Container
 
-```
+```bash
 docker ps
 ```
 
 ### Test App Directly
 
-```
+```bash
 curl http://<server-ip>:8080
 ```
 
 ### Test via Nginx
 
-```
+```bash
 curl http://<server-ip>
 ```
 
@@ -292,7 +292,7 @@ curl http://<server-ip>
 
 ## 🔄 Re-Deploy with Different App
 
-```
+```bash
 ansible-playbook site.yml --tags docker \
 -e "docker_app_image=httpd docker_app_name=apache-app"
 ```
