@@ -70,7 +70,7 @@ ansible-docker-project/
 ### 1. Clone Repo
 
 ```
-git clone <your-repo-url>
+git clone https://github.com/Shibnath27/ansible-docker-project.git
 cd ansible-docker-project
 ```
 
