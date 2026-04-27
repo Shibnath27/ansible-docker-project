@@ -1,1 +1,4 @@
 .vault_pass
+group_vars/web/vault.yml
+.vault_password
+.vault_pass*.txt
