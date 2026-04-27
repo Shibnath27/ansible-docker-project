@@ -1,11 +1,11 @@
 ---
 - name: Update package cache
-  yum:
+  apt:
     update_cache: true
   tags: common
 
 - name: Install common packages
-  yum:
+  apt:
     name: "{{ common_packages }}"
     state: present
   tags: common
