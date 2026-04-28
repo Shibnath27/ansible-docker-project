@@ -32,7 +32,7 @@
       URIs: https://download.docker.com/linux/ubuntu
       Suites: {{ ansible_distribution_release }}
       Components: stable
-      Architectures: {{ ansible_architecture }}
+      Architectures: amd64
       Signed-By: /etc/apt/keyrings/docker.asc
 
 # Update the apt package index to include the new Docker repository
