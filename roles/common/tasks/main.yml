@@ -23,7 +23,7 @@
 - name: Create deploy user
   user:
     name: deploy
-    groups: wheel
+    groups: sudo
     shell: /bin/bash
     state: present
   tags: common
