@@ -46,9 +46,9 @@
     content: |
       Types: deb
       URIs: https://download.docker.com/linux/ubuntu
-      Suites: {{ ubuntu_codename.stdout }}
+      Suites: {{ ansible_distribution_release }}
       Components: stable
-      Architectures: {{ system_arch.stdout }}
+      Architectures: {{ ansible_architecture | replace('amd64', 'amd64')}}
       Signed-By: /etc/apt/keyrings/docker.asc
     mode: '0644'
 
