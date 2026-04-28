@@ -28,15 +28,8 @@ It automates:
 
 ## 🏗️ Architecture
 
-```
-Control Node (Ansible)
-        |
-        | SSH
-        ↓
-Managed Node (EC2)
-   ├── Docker Container (App running on port 8080)
-   └── Nginx Reverse Proxy (Port 80 → 8080)
-```
+<img width="1536" height="1024" alt="ChatGPT Image Apr 28, 2026, 03_20_10 PM" src="https://github.com/user-attachments/assets/6be79ece-d1ba-44d0-8c67-de0110a6c7a0" />
+
 
 ---
 
