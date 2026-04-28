@@ -47,20 +47,27 @@ ansible-docker-project/
 │
 ├── ansible.cfg
 ├── inventory.ini
-├── site.yml
+├── site.yml                            # Master playbook
 │
 ├── group_vars/
-│   ├── all.yml
+│   ├── all.yml                         # Common variables
 │   └── web/
-│       ├── vars.yml
-│       └── vault.yml
+│       └── vault.yml                   # Encrypted Docker Hub credentials
 │
-├── roles/
-│   ├── common/
-│   ├── docker/
-│   └── nginx/
-│
-└── templates/
+└── roles/
+    ├── common                          # Shared setup for all servers
+    │    └── tasks/main.yml
+    ├── docker                          # Docker installation and container management
+    │      ├── tasks/main.yml
+    │      ├── handlers/main.yml
+    │      └── defaults/main.yml
+    └── nginx                           # Nginx reverse proxy
+          ├── tasks/main.yml
+          ├── templates
+          │     └──app-proxy.conf.j2
+          ├── handlers/main.yml
+          └── defaults/main.yml
+
 ```
 
 ---
@@ -96,7 +103,7 @@ ansible-galaxy init roles/nginx
 web-server ansible_host=<PUBLIC_IP>
 
 [all:vars]
-ansible_user=ec2-user
+ansible_user=ubuntu
 ansible_ssh_private_key_file=~/.ssh/ansible-practice
 ansible_python_interpreter=/usr/bin/python3
 ```
@@ -150,7 +157,7 @@ The common role runs on every server -- baseline packages and setup.
 - name: Create deploy user
   user:
     name: deploy
-    groups: wheel
+    groups: sudo
     shell: /bin/bash
     state: present
   tags: common
@@ -446,7 +453,28 @@ curl http://<server-ip>
 ```
 
 ---
+## 🎯 So I actually built THIS architecture:
 
+```scss
+             ┌──────────────────────────┐
+             │        USER              │
+             └──────────┬───────────────┘
+                        │
+        ┌───────────────┴───────────────┐
+        │                               │
+   Port 80                         Port 8080
+        │                               │
+        ▼                               ▼
+ Host Nginx                    Docker container
+ (Reverse Proxy)               (Nginx inside)
+        │
+        ▼
+ localhost:8080
+        │
+        ▼
+ Docker container
+ 
+```
 ## 🔄 Re-Deploy with Different App
 
 ```bash
