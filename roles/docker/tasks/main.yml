@@ -29,16 +29,6 @@
     dest: /etc/apt/keyrings/docker.asc
     mode: '0644'
 
-- name: Get Ubuntu codename
-  command: lsb_release -cs
-  register: ubuntu_codename
-  changed_when: false
-
-- name: Get system architecture
-  command: dpkg --print-architecture
-  register: system_arch
-  changed_when: false
-
 # Register the official Docker APT repository as a package source
 - name: Add Docker Repository
   ansible.builtin.copy:
