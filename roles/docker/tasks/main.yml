@@ -1,23 +1,11 @@
-# Install aptitude so Ansible can manage packages more reliably
-- name: Install aptitude
-  apt:
-    name: aptitude
-    state: latest
-    update_cache: true
-
 # Install packages required before Docker can be added
 - name: Install required system packages
   apt:
     pkg:
-          - apt-transport-https
-          - ca-certificates
-          - curl
-          - software-properties-common
-          - python3-pip
-          - virtualenv
-          - python3-setuptools
-          - gnupg
-          - lsb-release
+      - ca-certificates
+      - curl
+      - gnupg2
+      - lsb-release
     state: latest
     update_cache: true
 
@@ -30,41 +18,40 @@
 
 # Add Docker's official GPG key to verify package integrity
 - name: Add Docker GPG apt Key
-  shell: |
-    curl -fsSL https://download.docker.com/linux/ubuntu/gpg \
-    | gpg --dearmor -o /etc/apt/keyrings/docker.gpg
-  args:
-    creates: /etc/apt/keyrings/docker.gpg
+  apt_key:
+    url: https://download.docker.com/linux/ubuntu/gpg
+    state: present
 
 # Register the official Docker APT repository as a package source
 - name: Add Docker Repository
-  shell: |
-    echo "deb [arch=$(dpkg --print-architecture) \
-    signed-by=/etc/apt/keyrings/docker.gpg] \
-    https://download.docker.com/linux/ubuntu \
-    $(. /etc/os-release && echo $VERSION_CODENAME) stable" \
-    > /etc/apt/sources.list.d/docker.list
-
-# Update the apt cache to include the new Docker repository
-- name: Update apt cache
-  apt:
+  apt_repository:
+    repo: "deb [arch=amd64] https://download.docker.com/linux/{{ ansible_distribution | lower }} {{ ansible_distribution_release }} stable"
+    state: present
     update_cache: yes
 
-# Install Docker Engine and related packages
-- name: Install Docker Engine
+# Install Docker Engine, CLI, containerd, and plugins
+- name: install docker and its dependencies
   apt:
-    name:
+    pkg:
       - docker-ce
       - docker-ce-cli
       - containerd.io
+      - docker-buildx-plugin
       - docker-compose-plugin
-    state: latest
+    state: present
 
 - name: Start and enable Docker
   service:
     name: docker
     state: started
-    enabled: true
+    enabled: yes
+
+# Start and enable containerd
+- name: start and enable containerd daemon
+  service:
+    name: containerd
+    state: started
+    enabled: yes
 
 - name: Ensure docker group exists
   group:
@@ -76,11 +63,6 @@
     name: ubuntu
     groups: docker
     append: yes
-
-# Install Docker Compose using pip
-- name: Install Docker Python SDK
-  pip:
-    name: docker
 
 - name: Login to Docker Hub
   community.docker.docker_login:
