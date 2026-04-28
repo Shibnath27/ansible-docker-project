@@ -522,26 +522,8 @@ curl http://<server-ip>
 ---
 ## 🎯 So I actually built THIS architecture:
 
-```scss
-             ┌──────────────────────────┐
-             │        USER              │
-             └──────────┬───────────────┘
-                        │
-        ┌───────────────┴───────────────┐
-        │                               │
-   Port 80                         Port 8080
-        │                               │
-        ▼                               ▼
- Host Nginx                    Docker container
- (Reverse Proxy)               (Nginx inside)
-        │
-        ▼
- localhost:8080
-        │
-        ▼
- Docker container
- 
-```
+<img width="1440" height="1480" alt="image" src="https://github.com/user-attachments/assets/eda75b46-c671-4da0-a09a-aa467d8d406c" />
+
 ## 🔄 Re-Deploy with Different App
 
 ```bash
