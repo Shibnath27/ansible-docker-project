@@ -199,16 +199,89 @@ docker_container_port: 80
 ### `roles/docker/tasks/main.yml`
 
 ```yaml
-- name: Install Docker
-  yum:
-    name: docker
+- name: Update apt cache
+  apt:
+    update_cache: yes
+
+# Install packages required before Docker can be added
+- name: Install required system packages
+  apt:
+    pkg:
+      - ca-certificates
+      - curl
+      - gnupg2
+      - lsb-release
+      - apt-transport-https
+      - software-properties-common
+    state: latest
+    update_cache: true
+
+# Create the keyrings directory if it doesn't exist (required for newer versions of apt)
+- name: Create keyrings directory
+  file:
+    path: /etc/apt/keyrings
+    state: directory
+    mode: '0755'
+
+# Add Docker's official GPG key to verify package integrity
+- name: Add Docker GPG apt Key
+  ansible.builtin.get_url:
+    url: https://download.docker.com/linux/ubuntu/gpg
+    dest: /etc/apt/keyrings/docker.asc
+    mode: '0644'
+
+# Register the official Docker APT repository as a package source
+- name: Add Docker Repository
+  ansible.builtin.copy:
+    dest: /etc/apt/sources.list.d/docker.sources
+    content: |
+      Types: deb
+      URIs: https://download.docker.com/linux/ubuntu
+      Suites: {{ ansible_distribution_release }}
+      Components: stable
+      Architectures: {{ ansible_architecture | replace('x86_64', 'amd64') | replace('aarch64', 'arm64') }}
+      Signed-By: /etc/apt/keyrings/docker.asc
+    mode: '0644'
+
+# Update the apt package index to include the new Docker repository
+- name: Update apt cache
+  apt:
+    update_cache: yes
+
+# Install Docker Engine, CLI, containerd, and plugins
+- name: install docker and its dependencies
+  apt:
+    pkg:
+      - docker-ce
+      - docker-ce-cli
+      - containerd.io
+      - docker-buildx-plugin
+      - docker-compose-plugin
     state: present
 
-- name: Start Docker
+- name: Start and enable Docker
   service:
     name: docker
     state: started
-    enabled: true
+    enabled: yes
+
+# Start and enable containerd
+- name: start and enable containerd daemon
+  service:
+    name: containerd
+    state: started
+    enabled: yes
+
+- name: Ensure docker group exists
+  group:
+    name: docker
+    state: present
+
+- name: Add deploy user to docker group
+  user:
+    name: ubuntu
+    groups: docker
+    append: yes
 
 - name: Login to Docker Hub
   community.docker.docker_login:
@@ -239,6 +312,7 @@ docker_container_port: 80
   delay: 3
   register: health_check
   until: health_check.status == 200
+
 ```
 Tag all tasks with docker.
 
